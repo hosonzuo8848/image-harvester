@@ -9,6 +9,11 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0,1,2,3,4,5]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,4 +43,6 @@ jobs:
           DST_GUJI_BUCKET: guji-sea
           PAGE_WORKERS: "4"
           SETS_KEY: ${{ github.event.inputs.sets_key }}
+          SHARD: ${{ matrix.shard }}
+          TOTAL: "6"
         run: python _p/batch_gap.py
