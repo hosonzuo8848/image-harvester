@@ -30,7 +30,7 @@ jobs:
       - name: run shard
         env:
           P: ${{ secrets.P }}
-          EDGE_PROXY: ${{ secrets.EDGE_PROXY_PDF }}
+          EDGE_PROXY: https://naikaku-dl.hosonzuo.workers.dev/fetch?url=
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_KEY: ${{ secrets.R2_KEY }}
           R2_SECRET: ${{ secrets.R2_SECRET }}
