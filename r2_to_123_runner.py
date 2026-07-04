@@ -12,8 +12,13 @@ PAN_SEC = os.environ["PAN_SEC"]
 BUCKET = os.environ.get("BUCKET", "guji-sea")
 PAN_PARENT = os.environ.get("PAN_PARENT", "0")  # 目标父目录ID·"0"=中医号根
 
+import urllib3
+urllib3.disable_warnings()
+from botocore.config import Config
 s3 = boto3.client("s3", endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=R2_KEY, aws_secret_access_key=R2_SECRET, region_name="auto")
+    aws_access_key_id=R2_KEY, aws_secret_access_key=R2_SECRET,
+    region_name="auto", verify=False,
+    config=Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}))
 
 B123 = "https://open-api.123pan.com"
 class Pan:
