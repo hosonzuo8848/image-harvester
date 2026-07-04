@@ -1,0 +1,35 @@
+name: harvest-ia
+# IA(Internet Archive)中医古籍全文云端并发抓取
+# 全新 workflow,不改任何现有 harvest-*.yml。
+# 走 ia-egress-{1,2,3}(全新命名 CF Worker,不碰任何现有生产 worker/D1/R2其他前缀)。
+# 无需任何 CF/R2 secrets —— Worker 已封装凭据,client 侧只发 HTTP GET。
+on:
+  workflow_dispatch:
+    inputs:
+      total:
+        description: number of shards
+        default: "20"
+      sleep:
+        description: 每请求间隔秒数(温和限速,archive.org全局限流探测中,别调太小)
+        default: "0.6"
+      max_per_shard:
+        description: 单shard最多处理数(0=不限;先小规模验证时可设小值防爆炸)
+        default: "0"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: run shard
+        run: |
+          python ia_worker.py --shard ${{ matrix.shard }} --total ${{ github.event.inputs.total }} \
+            --sleep ${{ github.event.inputs.sleep }} --max-per-shard ${{ github.event.inputs.max_per_shard }}
