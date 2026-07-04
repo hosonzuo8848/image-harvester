@@ -1,0 +1,19 @@
+name: test-egress
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: runner-test-egress
+        run: |
+          echo "runner-IP: $(curl -s --max-time 15 https://api.ipify.org)"
+          echo "== freezz 自定义域 =="
+          for d in z.freezz.dpdns.org nz1.bnp.indevs.in; do
+            echo "$d -> $(curl -s -o /tmp/o -w '%{http_code}|%{size_download}B|%{content_type}' --max-time 60 "https://$d/?id=4018608&from=1&to=100")"
+          done
+          echo "== naikaku-zip 自有egress(POST contentDownload) =="
+          for w in naikaku-zip naikaku-mine naikaku-zip-2; do
+            echo "$w -> $(curl -s -o /tmp/z -w '%{http_code}|%{size_download}B|%{content_type}' --max-time 60 -X POST "https://$w.hosonzuo.workers.dev/contentDownload/4018608?type=imageJpeg" -H 'Content-Type: application/x-www-form-urlencoded' --data 'cid=da12%2F4018608' )"
+          done
+          echo "== 直连内閣(runner IP) =="
+          echo "direct -> $(curl -s -o /tmp/d -w '%{http_code}|%{size_download}B' --max-time 40 'https://www.digital.archives.go.jp/img/4018608')"
