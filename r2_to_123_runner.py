@@ -101,21 +101,27 @@ def main():
     pan = Pan()
     keys = list_keys(a.prefix, a.limit)
     print(f"待转 {len(keys)} keys · prefix={a.prefix} · parent={PAN_PARENT}", flush=True)
-    ok = fail = skip = 0; t0 = time.time()
+    ok = fail = del_r2 = 0; t0 = time.time()
     for i, k in enumerate(keys, 1):
         try:
             obj = s3.get_object(Bucket=BUCKET, Key=k)
             data = obj["Body"].read()
-            name = k.replace("/", "_")   # 扁平化文件名(先简化·后续改分层)
+            sz_kb = len(data)//1024
+            name = k.replace("/", "_")
             r = pan.upload(PAN_PARENT, name, data)
-            if r=="ok": ok+=1
-            else: skip+=1
-            print(f"[{i}/{len(keys)}] {r} {k[-50:]} {len(data)//1024}KB", flush=True)
+            if r == "ok":
+                ok += 1
+                # 传成功·立刻删R2(一个个转·一个个删·不积累)
+                s3.delete_object(Bucket=BUCKET, Key=k)
+                del_r2 += 1
+                print(f"[{i}/{len(keys)}] OK+删R2 {sz_kb}KB {k[-50:]}", flush=True)
+            else:
+                print(f"[{i}/{len(keys)}] {r} {sz_kb}KB {k[-50:]}", flush=True)
         except Exception as e:
-            fail+=1
-            print(f"[{i}/{len(keys)}] ERR {k[-50:]} {str(e)[:60]}", flush=True)
+            fail += 1
+            print(f"[{i}/{len(keys)}] ERR {k[-50:]} {str(e)[:80]}", flush=True)
     el = time.time() - t0
-    print(f"\n=== 完 ok={ok} skip={skip} fail={fail} · {el/60:.1f}min ===", flush=True)
+    print(f"\n=== 完 传+删R2 {ok} · fail {fail} · {el/60:.1f}min ===", flush=True)
 
 if __name__ == "__main__":
     main()
