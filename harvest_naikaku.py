@@ -77,3 +77,8 @@ ts = [threading.Thread(target=worker, args=(i,)) for i in range(BOOK_PAR)]
 el = time.time() - t0
 mbps = (cnt["bytes"] / 1024 / 1024) / el if el > 0 else 0
 print(f"\n=== 完 ok={cnt['ok']} fail={cnt['fail']} · {cnt['bytes']//1024//1024}MB · {el/60:.1f}min · {mbps:.2f}MB/s ===", flush=True)
+
+# 假绿止血(2026-07-05):全部失败却绿色 success 骗人 → ok=0 时红色报警
+if cnt["ok"] == 0 and cnt["fail"] > 0:
+    print("!! ok=0 全失败 · exit 1 暴露红色", flush=True)
+    sys.exit(1)
