@@ -1,58 +1,42 @@
 name: harvest-naikaku
 on:
-  schedule:
-    - cron: '0 */6 * * *'   # med_todo (医书·R2允许·子部古籍不走云端见钦定)
   workflow_dispatch:
     inputs:
       total:
-        description: "DEPRECATED·实际固定8(留兼容)"
-        default: "8"
-      list_key:
-        description: worklist key in R2 (med_todo·⚠️子部古籍绝不进R2·别传shibu)
-        default: "_worklist/med_todo.csv"
-      edge_proxy:
-        description: egress proxy (502 换IP用)
-        default: "https://naikaku-dl.hosonzuo.workers.dev/fetch?url="
-      force:
-        description: "1=缺页整本重下覆盖(补残·跳过skip)"
-        default: ""
-concurrency:
-  group: harvest-naikaku
-  cancel-in-progress: false
+        description: shard 数
+        default: "5"
+      limit:
+        description: 每 shard 处理条数(0=全)
+        default: "3"
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 340
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 5
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
-    timeout-minutes: 340
+        shard: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libvips42 libvips-tools
-          pip install -q pyvips boto3 requests pillow opencc
-      - name: run shard
+        run: pip install -q requests pillow img2pdf
+      - name: harvest
         env:
-          P: ${{ secrets.P }}
-          EDGE_PROXY: ${{ github.event.inputs.edge_proxy || 'https://naikaku-dl.hosonzuo.workers.dev/fetch?url=' }}
-          NAIKAKU_ZIP: https://naikaku-zip.hosonzuo.workers.dev,https://naikaku-mine.hosonzuo.workers.dev,https://naikaku-zip-2.hosonzuo.workers.dev,https://naikaku-zip-3.hosonzuo.workers.dev,https://naikaku-zip-4.hosonzuo.workers.dev,https://naikaku-zip-5.hosonzuo.workers.dev,https://naikaku-zip-6.hosonzuo.workers.dev,https://naikaku-zip-7.hosonzuo.workers.dev
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_KEY: ${{ secrets.R2_KEY }}
-          R2_SECRET: ${{ secrets.R2_SECRET }}
-          CF_ACCOUNT: ${{ secrets.CF_ACCOUNT }}
-          CF_D1_DB: ${{ secrets.CF_D1_DB }}
-          CF_D1_TOKEN: ${{ secrets.CF_D1_TOKEN }}
-          LIST_BUCKET: ${{ secrets.LIST_BUCKET }}
-          LIST_KEY: ${{ github.event.inputs.list_key || '_worklist/med_todo.csv' }}
-          DST_BUCKET: guyaofang-lib
-          DST_GUJI_BUCKET: naikaku-dl
-          PAGE_WORKERS: "10"
-          FORCE: ${{ github.event.inputs.force }}
-        run: python stub.py --source naikaku --shard ${{ matrix.shard }} --total 8
+          WORKLIST: worklist_缺.csv
+          OUT: out
+          SHARD: ${{ matrix.shard }}
+          TOTAL: ${{ github.event.inputs.total || '5' }}
+          LIMIT: ${{ github.event.inputs.limit || '3' }}
+        run: python harvest_naikaku.py
+      - name: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: naikaku-shard-${{ matrix.shard }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: warn
