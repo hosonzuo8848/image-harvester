@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# NDL 古籍全文采集(Actions runner 直连,不存 R2/D1)-> out/(供 upload-artifact)
-# 照 harvest_artifact.py 的 shard/artifact 模式:runner 海外IP直连 NDL(CloudFront CDN,实测无需代理无限流)。
+# NDL 古籍全文采集(Actions runner 直连)-> 直写 R2 语料桶。
+# CTO 2026-07-05:一步到位直写 R2 持久存储,不经 upload-artifact(临时缓存=白干)。
 # 全文接口:fulltext-json/{id} 返回坐标块数组,按 page 分组、组内按 (rectY,rectX) 排序、拼 contents 成整页文本。
 import argparse
 import csv
@@ -10,27 +10,33 @@ import os
 import time
 
 import requests
+import boto3
 
 BASE = "https://lab.ndl.go.jp/dl/api/book"
 UA = {"User-Agent": "Mozilla/5.0 (compatible; GujiArchive/1.0)"}
 
+EP, AK, SK = os.environ["R2_ENDPOINT"], os.environ["R2_KEY"], os.environ["R2_SECRET"]
+BUCKET = os.environ.get("TEXT_BUCKET", "guyaofang-assets")   # 语料桶(现有语料医书就在这)
+PREFIX = os.environ.get("TEXT_PREFIX", "text/ndl/")          # NDL 古籍全文语料前缀
+s3 = boto3.client("s3", endpoint_url=EP, aws_access_key_id=AK,
+                  aws_secret_access_key=SK, region_name="auto")
+
 
 def fetch_json(session, url, timeout=60, tries=3):
-    last_status = None
+    last = None
     for a in range(tries):
         try:
             r = session.get(url, headers=UA, timeout=timeout)
             if r.status_code == 200:
                 return r.json()
-            last_status = r.status_code
+            last = r.status_code
         except Exception as e:
-            last_status = str(e)[:50]
+            last = str(e)[:50]
         time.sleep(2 * (a + 1))
-    raise RuntimeError(f"HTTP fail: {last_status}")
+    raise RuntimeError(f"HTTP fail: {last}")
 
 
 def pull_fulltext(session, bid):
-    """拉 fulltext-json,按 page 分组、组内按 (rectY,rectX) 排序、拼 contents 成整页文本"""
     j = fetch_json(session, f"{BASE}/fulltext-json/{bid}")
     blocks = j.get("list", []) if isinstance(j, dict) else (j or [])
     pages = {}
@@ -40,11 +46,17 @@ def pull_fulltext(session, bid):
     for pg in sorted(pages):
         bl = sorted(pages[pg], key=lambda b: (b.get("rectY", 0), b.get("rectX", 0)))
         parts.append("".join(b.get("contents", "") or "" for b in bl))
-    text = "\n".join(parts)
-    return text, len(pages)
+    return "\n".join(parts), len(pages)
 
 
-def one(session, bid, out_dir):
+def one(session, bid):
+    key = f"{PREFIX}{bid}.txt"
+    try:
+        s3.head_object(Bucket=BUCKET, Key=key)   # 幂等:已在 R2 就跳过
+        print(f"{bid}: skip(已在R2)", flush=True)
+        return "skip"
+    except Exception:
+        pass
     try:
         text, npages = pull_fulltext(session, bid)
     except Exception as e:
@@ -53,14 +65,12 @@ def one(session, bid, out_dir):
     if not text.strip():
         print(f"{bid}: 零文本(全文接口无内容)", flush=True)
         return False
-    d = os.path.join(out_dir, bid)
-    os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, f"{bid}.txt"), "w", encoding="utf-8") as f:
-        f.write(text)
-    meta = {"id": bid, "pages": npages, "chars": len(text), "source": "ndl_fulltext"}
-    with open(os.path.join(d, "_meta.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False)
-    print(f"{bid}: {npages}页 {len(text)}字 OK", flush=True)
+    s3.put_object(Bucket=BUCKET, Key=key,
+                  Body=text.encode("utf-8"), ContentType="text/plain; charset=utf-8")
+    s3.put_object(Bucket=BUCKET, Key=f"{PREFIX}{bid}._meta.json",
+                  Body=json.dumps({"id": bid, "pages": npages, "chars": len(text),
+                                   "source": "ndl_fulltext"}, ensure_ascii=False).encode("utf-8"))
+    print(f"{bid}: {npages}页 {len(text)}字 -> R2 {BUCKET}/{key}", flush=True)
     return True
 
 
@@ -70,31 +80,33 @@ def main():
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--total", type=int, default=1)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--out", default="out")
     a = ap.parse_args()
 
     rows = list(csv.DictReader(open(a.worklist, encoding="utf-8-sig")))
-    jobs = [r["id"].strip() for i, r in enumerate(rows) if r.get("id", "").strip() and i % a.total == a.shard]
+    jobs = [r["id"].strip() for i, r in enumerate(rows)
+            if r.get("id", "").strip() and i % a.total == a.shard]
     if a.limit:
         jobs = jobs[: a.limit]
-    print(f"shard {a.shard}/{a.total}: 分到 {len(jobs)} 本", flush=True)
+    print(f"shard {a.shard}/{a.total}: 分到 {len(jobs)} 本 -> 直写 R2 {BUCKET}/{PREFIX}", flush=True)
 
-    os.makedirs(a.out, exist_ok=True)
     s = requests.Session()
-    s.trust_env = False  # 直连 NDL,不走系统代理(CloudFront CDN,实测无限流无封IP)
+    s.trust_env = False   # 直连 NDL(CloudFront CDN,实测无限流无封IP)
 
-    ok, fail = 0, 0
+    ok = fail = skip = 0
     t0 = time.time()
     for i, bid in enumerate(jobs, 1):
-        if one(s, bid, a.out):
+        r = one(s, bid)
+        if r == "skip":
+            skip += 1
+        elif r:
             ok += 1
         else:
             fail += 1
         if i % 20 == 0:
-            print(f"  进度 {i}/{len(jobs)} · ok={ok} fail={fail}", flush=True)
-        time.sleep(0.2)  # 温和:每本间隔,不猛戳
+            print(f"  进度 {i}/{len(jobs)} · ok={ok} skip={skip} fail={fail}", flush=True)
+        time.sleep(0.2)   # 温和
 
-    print(f"\n=== shard {a.shard} 完 ok={ok} fail={fail} · {(time.time()-t0)/60:.1f}min ===", flush=True)
+    print(f"\n=== shard {a.shard} 完 ok={ok} skip={skip} fail={fail} · {(time.time()-t0)/60:.1f}min ===", flush=True)
 
 
 if __name__ == "__main__":

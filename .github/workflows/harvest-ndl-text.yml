@@ -1,5 +1,6 @@
 # 四号编队第1/4段(hosonzuo8848):全局 shard 0-19 / 80。
 # 另外三仓(hosonzuo / w8848 / gufangAI)各跑 20-39 / 40-59 / 60-79,total 统一 80,互不重叠。
+# CTO 2026-07-05:worker 直写 R2 语料桶 guyaofang-assets/text/ndl/,不再 upload-artifact(临时缓存=白干)。
 name: harvest-ndl-text
 on:
   workflow_dispatch:
@@ -17,6 +18,10 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_KEY: ${{ secrets.R2_KEY }}
+      R2_SECRET: ${{ secrets.R2_SECRET }}
     strategy:
       fail-fast: false
       max-parallel: 20
@@ -28,15 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: deps
-        run: pip install -q requests
-      - name: harvest shard
+        run: pip install -q requests boto3
+      - name: harvest shard -> 直写 R2
         timeout-minutes: 330
-        run: python harvest_ndl_text.py --worklist worklist_ndl_text.csv --shard ${{ matrix.shard }} --total ${{ github.event.inputs.total || '80' }} --limit ${{ github.event.inputs.limit || '0' }} --out out
-      - name: upload
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ndl-text-shard-${{ matrix.shard }}
-          path: out/
-          retention-days: 7
-          if-no-files-found: ignore
+        run: python harvest_ndl_text.py --worklist worklist_ndl_text.csv --shard ${{ matrix.shard }} --total ${{ github.event.inputs.total || '80' }} --limit ${{ github.event.inputs.limit || '0' }}
