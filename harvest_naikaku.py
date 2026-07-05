@@ -12,7 +12,12 @@ TOTAL = int(os.environ.get("TOTAL", "1"))
 LIMIT = int(os.environ.get("LIMIT", "0"))
 
 sess = requests.Session()
-sess.headers.update({"User-Agent": "Mozilla/5.0 Chrome/124.0", "Accept-Language": "ja"})
+sess.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "ja,en-US;q=0.7,en;q=0.3",
+    "Referer": "https://www.digital.archives.go.jp/",
+})
 
 def page_urls(m, size="max"):
     seqs = m.get("sequences") or []
@@ -35,16 +40,22 @@ def one(iid, mfst_url):
         if not urls: return None, "0页"
     except Exception as e:
         return None, f"manifest err {str(e)[:40]}"
+    # 先访 img/{iid} 页面模拟浏览器行为(种 cookie / 触发 hotlink 检查)
+    try:
+        sess.get(f"https://www.digital.archives.go.jp/img/{iid}", timeout=30)
+        time.sleep(0.5)
+    except: pass
     imgs = []
     for u in urls:
         if not u: imgs.append(None); continue
         for _ in range(3):
             try:
-                rr = sess.get(u, timeout=90)
+                rr = sess.get(u, timeout=90, headers={"Referer": f"https://www.digital.archives.go.jp/img/{iid}"})
                 if rr.status_code == 200 and "image" in rr.headers.get("content-type", ""):
                     imgs.append(rr.content); break
             except: time.sleep(1.5)
         else: imgs.append(None)
+        time.sleep(0.3)  # 温和
     got = [b for b in imgs if b]
     if len(got) < len(urls) - 1: return None, f"缺 {len(got)}/{len(urls)}"
     return got, ""
