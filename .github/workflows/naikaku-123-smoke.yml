@@ -1,0 +1,28 @@
+name: naikaku-123-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        default: "3"
+      total:
+        default: "1"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests img2pdf
+      - name: harvest
+        env:
+          WORKLIST: worklist_smoke.csv
+          SHARD: "0"
+          TOTAL: ${{ github.event.inputs.total || '1' }}
+          LIMIT: ${{ github.event.inputs.limit || '3' }}
+          BOOK_PAR: "2"
+          PAN_CID_MAIN: ${{ secrets.PAN_CID_MAIN }}
+          PAN_SEC_MAIN: ${{ secrets.PAN_SEC_MAIN }}
+        run: python harvest_naikaku_123.py
