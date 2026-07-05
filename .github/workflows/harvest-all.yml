@@ -1,0 +1,39 @@
+name: harvest-all
+on:
+  workflow_dispatch:
+    inputs:
+      total:
+        default: "20"
+      limit:
+        default: "0"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: deps
+        run: pip install -q requests pillow img2pdf
+      - name: harvest
+        env:
+          WORKLIST: worklist_有效缺.csv
+          OUT: out
+          SHARD: ${{ matrix.shard }}
+          TOTAL: ${{ github.event.inputs.total || '20' }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+        run: python harvest_naikaku.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: all-shard-${{ matrix.shard }}
+          path: out/
+          retention-days: 7
+          if-no-files-found: warn
