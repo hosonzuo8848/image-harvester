@@ -6,10 +6,13 @@ on:
         description: "worklist csv (repo relative)"
         default: "worklist_naikaku_b_med.csv"
       total:
-        description: number of shards
-        default: "20"
+        description: total shard count (multi-account fleet uses same total)
+        default: "60"
+      shard_start:
+        description: shard offset (号 1=0, 号 2=20, 号 3=40 for 60-shard fleet)
+        default: "0"
       max_parallel:
-        description: max_parallel runners
+        description: max_parallel runners per account
         default: "20"
 concurrency:
   group: naikaku-b-fleet
@@ -32,12 +35,12 @@ jobs:
         run: pip install -q requests pillow img2pdf
       - name: harvest shard (B version · 4-tile · 4000w · JPEG q80)
         timeout-minutes: 330
-        run: python harvest_artifact_b.py --worklist ${{ github.event.inputs.worklist || 'worklist_naikaku_b_med.csv' }} --shard ${{ matrix.shard }} --total ${{ github.event.inputs.total || '20' }} --out out
+        run: python harvest_artifact_b.py --worklist ${{ github.event.inputs.worklist || 'worklist_naikaku_b_med.csv' }} --shard ${{ matrix.shard }} --total ${{ github.event.inputs.total || '60' }} --shard-start ${{ github.event.inputs.shard_start || '0' }} --out out
       - name: upload
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: naikaku-b-shard-${{ matrix.shard }}
+          name: naikaku-b-shard-${{ github.event.inputs.shard_start || '0' }}-${{ matrix.shard }}
           path: out/
           retention-days: 7
           if-no-files-found: ignore

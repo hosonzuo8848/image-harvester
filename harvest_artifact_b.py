@@ -76,12 +76,14 @@ if __name__ == '__main__':
     p.add_argument('--worklist', required=True)
     p.add_argument('--shard', type=int, required=True)
     p.add_argument('--total', type=int, required=True)
+    p.add_argument('--shard-start', type=int, default=0, help='加到 shard 上·三号铺开用')
     p.add_argument('--out', default='out')
     a = p.parse_args()
 
     rows = list(csv.DictReader(open(a.worklist, encoding='utf-8-sig')))
-    my = [r for i, r in enumerate(rows) if i % a.total == a.shard]
-    print(f'shard {a.shard}/{a.total} · {len(my)}/{len(rows)} 本', flush=True)
+    real_shard = a.shard + a.shard_start
+    my = [r for i, r in enumerate(rows) if i % a.total == real_shard]
+    print(f'shard {real_shard}/{a.total} (arg={a.shard}+offset={a.shard_start}) · {len(my)}/{len(rows)} 本', flush=True)
 
     ok, fail, skip = 0, 0, 0
     t0 = time.time()
