@@ -16,7 +16,9 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      max-parallel: 20
+      max-parallel: 2   # 2026-07-15: 原20并发把当轮IP集体打进内阁临时限流(11本全零页各耗27-32min才超时)
+                         # 改回 egress温和铁律 ≤2shard(同时最多2个在跑,20个分片仍保留、只是排队轮着跑)
+                         # probe已验证阻断已恢复(新IP manifest/整件下载秒级200)
       matrix:
         shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
     steps:
