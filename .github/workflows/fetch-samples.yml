@@ -1,0 +1,30 @@
+name: fetch-samples
+on:
+  workflow_dispatch:
+    inputs:
+      pan_dir_id:
+        default: "36780084"
+      max_pages:
+        default: "8"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - env:
+          PAN_CID: ${{ secrets.PAN_CID_NEW }}
+          PAN_SEC: ${{ secrets.PAN_SEC_NEW }}
+          PAN_DIR_ID: ${{ github.event.inputs.pan_dir_id }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages }}
+        run: |
+          curl -sL https://raw.githubusercontent.com/hosonzuo8848/image-harvester/main/fetch_samples_cloud.py -o fetch_samples_cloud.py
+          python fetch_samples_cloud.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: real-sample-pages
+          path: samples/
+          retention-days: 3
