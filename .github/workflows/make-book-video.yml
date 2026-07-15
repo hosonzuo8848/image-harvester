@@ -33,8 +33,8 @@ jobs:
           pip install -q requests pillow
       - name: generate video
         env:
-          PAN_CID: ${{ secrets.PAN_CID_MAIN }}
-          PAN_SEC: ${{ secrets.PAN_SEC_MAIN }}
+          PAN_CID: ${{ secrets.PAN_CID_NEW }}
+          PAN_SEC: ${{ secrets.PAN_SEC_NEW }}
           BOOK_ID: ${{ github.event.inputs.book_id }}
           PAN_DIR_ID: ${{ github.event.inputs.pan_dir_id }}
           BOOK_TITLE: ${{ github.event.inputs.book_title }}
