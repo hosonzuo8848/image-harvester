@@ -30,6 +30,8 @@ with open("sample.pdf", "wb") as f:
     f.write(pdf_bytes)
 
 import fitz  # PyMuPDF
+import io
+from PIL import Image
 doc = fitz.open("sample.pdf")
 n_pages = doc.page_count
 print(f"page_count = {n_pages}", flush=True)
@@ -45,7 +47,8 @@ for i in range(sample_n):
     # 150 DPI 渲染(阅读器实际用的分辨率量级,不是极限画质)
     pix = page.get_pixmap(dpi=150)
     webp_path = f"out_webp/page_{i+1:04d}.webp"
-    pix.save(webp_path)
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    img.save(webp_path, "WEBP", quality=85)
     total_webp_bytes += os.path.getsize(webp_path)
 render_time = time.time() - t1
 
