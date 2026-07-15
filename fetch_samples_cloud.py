@@ -27,13 +27,26 @@ print(f"取到 {len(kids)} 页: {[k['filename'] for k in kids]}", flush=True)
 
 out_dir = "samples"
 os.makedirs(out_dir, exist_ok=True)
+ok = 0
 for k in kids:
-    r3 = S.get(PAN + f"/api/v1/file/download_info?fileId={k['fileId']}", headers=h, timeout=30)
-    url = r3.json()["data"]["downloadUrl"]
-    fp = os.path.join(out_dir, k["filename"])
-    resp = S.get(url, timeout=60)
-    resp.raise_for_status()
-    open(fp, "wb").write(resp.content)
-    print("saved:", fp, len(resp.content), "bytes", flush=True)
+    for attempt in (1, 2):
+        try:
+            r3 = S.get(PAN + f"/api/v1/file/download_info?fileId={k['fileId']}", headers=h, timeout=30)
+            data = r3.json().get("data") or {}
+            url = data.get("downloadUrl")
+            if not url:
+                print(f"跳过(拿不到downloadUrl,attempt {attempt}): {k['filename']} resp={r3.text[:200]}", flush=True)
+                continue
+            resp = S.get(url, timeout=60)
+            resp.raise_for_status()
+            fp = os.path.join(out_dir, k["filename"])
+            open(fp, "wb").write(resp.content)
+            print("saved:", fp, len(resp.content), "bytes", flush=True)
+            ok += 1
+            break
+        except Exception as e:
+            print(f"失败(attempt {attempt}): {k['filename']} {e}", flush=True)
 
-print("DONE", len(kids), "pages ->", out_dir)
+print(f"DONE {ok}/{len(kids)} pages -> {out_dir}", flush=True)
+if ok == 0:
+    sys.exit("一页都没下下来")

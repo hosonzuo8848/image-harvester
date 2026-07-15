@@ -24,7 +24,9 @@ jobs:
           curl -sL https://raw.githubusercontent.com/hosonzuo8848/image-harvester/main/fetch_samples_cloud.py -o fetch_samples_cloud.py
           python fetch_samples_cloud.py
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: real-sample-pages
           path: samples/
           retention-days: 3
+          if-no-files-found: warn
