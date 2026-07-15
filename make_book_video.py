@@ -106,16 +106,34 @@ def main():
         "-c:v", "libx264", "-pix_fmt", "yuv420p", raw_video,
     ], check=True)
 
-    # 上下文字条(drawtext),竖屏9:16,顶部品牌语+底部书名
+    # 真文案 · 按时间段分层显示(不是一条静态品牌语飘到底),真实事实拼的,不瞎编
+    # NARRATIVE_JSON 可整体覆盖默认文案(以后接AI生成脚本,外部传JSON数组进来就换掉)
+    total_dur = DUR * len(jpg_paths)
+    default_narrative = [
+        (0.0, 2.5, TOP_TEXT),
+        (2.5, total_dur * 0.35, f"{BOOK_TITLE} · 日本現存最古老的醫學典籍"),
+        (total_dur * 0.35, total_dur * 0.65, "丹波康賴 撰於公元984年"),
+        (total_dur * 0.65, total_dur - 2.5, "十二世紀抄本 · 日本東京國立博物館珍藏至今"),
+        (total_dur - 2.5, total_dur, "古方AI星圖 · 持續尋回海外遺珍古籍"),
+    ]
+    narrative_json = os.environ.get("NARRATIVE_JSON")
+    narrative = json.loads(narrative_json) if narrative_json else default_narrative
+
+    FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
+
+    def esc(s):
+        return s.replace(":", r"\:").replace("'", r"\'").replace(",", r"\,")
+
+    segs = []
+    for start, end, text in narrative:
+        segs.append(
+            f"drawtext=fontfile={FONT}:text='{esc(text)}':fontsize=50:fontcolor=white:"
+            f"box=1:boxcolor=black@0.6:boxborderw=22:x=(w-text_w)/2:y=h-260:"
+            f"enable='between(t\\,{start:.2f}\\,{end:.2f})'"
+        )
+    drawtext = ",".join(segs)
+
     out_video = f"out_{BOOK_ID}.mp4"
-    top_esc = TOP_TEXT.replace(":", r"\:").replace("'", r"\'")
-    bottom_esc = f"{BOOK_TITLE} · 十二世纪抄本 · 日本東京國立博物館藏".replace(":", r"\:").replace("'", r"\'")
-    drawtext = (
-        f"drawtext=text='{top_esc}':fontsize=52:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=20:"
-        f"x=(w-text_w)/2:y=80,"
-        f"drawtext=text='{bottom_esc}':fontsize=38:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=16:"
-        f"x=(w-text_w)/2:y=h-160"
-    )
     subprocess.run([
         "ffmpeg", "-y", "-i", raw_video, "-vf", drawtext,
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", out_video,
