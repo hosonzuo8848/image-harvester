@@ -15,7 +15,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -q requests
       - env:
-          PAN_CID: ${{ secrets.PAN_CID_MAIN }}
-          PAN_SEC: ${{ secrets.PAN_SEC_MAIN }}
+          PAN_CID: ${{ secrets.PAN_CID_NEW }}
+          PAN_SEC: ${{ secrets.PAN_SEC_NEW }}
           FID: ${{ github.event.inputs.fid }}
         run: python diag_panid.py
