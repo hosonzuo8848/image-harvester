@@ -121,9 +121,12 @@ def main():
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy", out_video,
     ], check=True)
 
+    subprocess.run(["ffmpeg", "-y", "-i", out_video, "-ss", "3", "-frames:v", "1", "thumb.jpg"], check=True)
     print(f"=== 完成: {out_video} ===", flush=True)
     os.makedirs("out", exist_ok=True)
     os.replace(out_video, f"out/{out_video}")
+    if os.path.exists("thumb.jpg"):
+        os.replace("thumb.jpg", "out/thumb.jpg")
 
 
 if __name__ == "__main__":
