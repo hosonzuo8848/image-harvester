@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -17,9 +18,7 @@ jobs:
           PAN_CID: ${{ secrets.PAN_CID_NEW }}
           PAN_SEC: ${{ secrets.PAN_SEC_NEW }}
           FILE_ID: ${{ github.event.inputs.file_id }}
-        run: |
-          curl -sL https://raw.githubusercontent.com/hosonzuo8848/image-harvester/main/benchmark_pdf2webp.py -o benchmark_pdf2webp.py
-          python benchmark_pdf2webp.py
+        run: python benchmark_pdf2webp.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
