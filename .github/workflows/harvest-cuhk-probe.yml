@@ -1,0 +1,29 @@
+name: harvest-cuhk-probe
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: probe CUHK
+        run: |
+          echo "=== runner IP ==="
+          curl -s https://ifconfig.me
+          echo
+          echo "=== homepage ==="
+          curl -sSL -A "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/124 Safari/537.36" \
+            -o /tmp/home.html \
+            -w "HTTP %{http_code} · size %{size_download}\n" \
+            "https://repository.lib.cuhk.edu.hk/en/item/cuhk-904393"
+          echo "=== IIIF sample image ==="
+          curl -sSL -A "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/124 Safari/537.36" \
+            -o /tmp/p1.jpg \
+            -w "HTTP %{http_code} · size %{size_download}\n" \
+            "https://repository.lib.cuhk.edu.hk/iiif/2/cuhk%3A904394%7EJP2%7Epublic_default%7Ec24e28ab560e6654f5fd0862f12050fc22d933efbcc4a3257b9155a13d325395/full/full/0/default.jpg"
+          file /tmp/p1.jpg
+          echo "=== collection page ==="
+          curl -sSL -A "Mozilla/5.0" \
+            -o /tmp/coll.html \
+            -w "HTTP %{http_code} · size %{size_download}\n" \
+            "https://repository.lib.cuhk.edu.hk/en/collection/cuhk-chimed"
